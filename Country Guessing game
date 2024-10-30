@@ -1,0 +1,284 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.1.1/jquery.min.js">
+        </script>
+        <script>
+            $(document).ready(function(){
+                //to keep all the currently unneeded divs hidden
+                document.getElementById("play").style.display = "none";
+                document.getElementById("answers").style.display = "none";
+                document.getElementById("boardSelect").style.display = "none";
+                //nested api calls to ensure all data is collected before starting functions
+                $.get(
+                    'https://www.cs.kent.ac.uk/people/staff/yh/api/country-data/countries/regions', 
+                    function (regions) {
+                                //code all the js here
+                                //for each loop to iterate over the regions and display them in the document
+                                regions.forEach(element => {
+                                    //radio button selection(come back here to edit the radio button arrangements)
+                                    $('#regionSelect').append('<input name = "Region" type = "radio" value="'+element+'" id = "'+element+'"/>');
+                                    $('#regionSelect').append('<label for= "'+element+'">'+element+'    </label>');
+
+                                    
+                                    });
+                                    // cond1 and 2 to check whether user has selected from both options
+                                    // selectedRegion and BoardSizeNum to store the values collected from the radio buttons
+
+                                    let selectedRegion = "";
+                                    let BoardSizeNum = 0;
+                                    let cond1 = false;
+                                    let cond2 = false;
+
+                                    //stores the radio button value selected in selectedRegion and disables the inputs. sets cond1 to true. if cond1 and 2 true, shows the game
+                                    $('#regionSelect input').click(function(){
+                                        selectedRegion = $(this).val();
+                                        document.getElementById("boardSelect").style.display = "block";
+                                        cond1 = true
+                                        if (cond1==true && cond2==true){
+                                            $('#play').empty();
+                                            $('#answers').empty();
+                                            document.getElementById("answers").style.display = "none";
+                                            gameStart();
+                                        }
+                                    });
+
+                                    //stores the radio button value selected in BoardSizeNum and disables the inputs. sets cond1 to true. if cond1 and 2 true, shows the game
+                                    $('#boardSize input').click(function() {
+                                        BoardSizeNum = parseInt($(this).val());
+                                        cond2 = true
+                                        if (cond1==true && cond2==true){
+                                            $('#play').empty();
+                                            $('#answers').empty();
+                                            document.getElementById("answers").style.display = "none";
+                                            gameStart();
+                                        }
+                                    });
+
+                                    //prepares the game after recieving a region and board size
+                                    function gameStart () {
+                                        //gets region data from the api
+                                        let link =  'https://www.cs.kent.ac.uk/people/staff/yh/api/country-data/countries/region/'+selectedRegion;
+                                        $.get(
+                                            link, 
+                                            function (countries) {
+                                                let RelevantCountries = [];
+                                                //adds the countries to an array
+                                                countries.forEach(element => {
+                                                    if(element.region == selectedRegion){
+                                                        RelevantCountries.push(element);
+                                                }
+                                                });
+                                        
+                                                //defines the necessary amount of countries
+                                                var gameCountries = [];
+                                                let numberofCountries = 0;
+                                                if (BoardSizeNum == 2){
+                                                    numberofCountries = 4;
+                                                } else {
+                                                    numberofCountries = 8;
+                                                }
+                                                let choice = 0;
+                                                
+                                                //adds the right amount of countries to a separate array
+                                                while(gameCountries.length < numberofCountries && RelevantCountries.length != 0){
+                                                    choice = Math.floor(Math.random()*RelevantCountries.length);
+                                                    if (gameCountries.includes(RelevantCountries[choice]) == false){
+                                                        gameCountries.push(RelevantCountries[choice]);
+                                                        RelevantCountries.splice(choice, 1);
+                                                    }
+                                                    
+                                                }
+
+                                                //adds the info of individual cards to the panels array
+                                                let panels = [];
+                                                let j = 0;
+                                                gameCountries.forEach(element => {
+                                                    let ID = "e"+j;
+                                                    panels.push({"type":"flag", "Flag":element.flag, "name":element.name, "id":ID, "found":false})
+                                                    j++;
+                                                    ID = "e"+j;
+                                                    panels.push({"type":"match", "name":element.name , "capital":element.capital, "id":ID, "found":false})
+                                                    j++;
+
+                                                    $("#answers").append("<div class=AnswerBoxes><h4>"+element.name+"</h4><p>Capital: "+element.capital+"</p><image src="+element.flag+" class =imgs2></div>")
+                                                })
+
+                                                //randomises the panels array
+                                                panels.sort(() => Math.random() - 0.5);
+
+                                                //adds all the cards to the board in the right formation
+                                                let i = 0;
+                                                panels.forEach(element => {
+                                                    if (element.type == "flag"){ 
+                                                        $('#play').append('<div id ='+element.id+' class = "gameBoxes"><image src='+element.Flag+' class =imgs></div>');
+                                                    } else {
+                                                        if(element.capital != null){
+                                                            var content = "<h2>"+element.name+"</h2>"+ "<p>Capital: "+element.capital+"</p>";
+                                                        } else {
+                                                            var content = "<h2>"+element.name+"</h2>";
+                                                        }
+                                                        
+                                                        $('#play').append('<div id ='+element.id+' class = "gameBoxes" >'+content+'</div>');
+                                                    }
+                                                    if(i == 3){
+                                                        $('#play').append('<br>')
+                                                        i = 0
+                                                    }else{
+                                                        i++;
+                                                    }
+                                               })
+
+                                               //sets up the match counter and the show answer button
+                                               let matchCount = 0;
+                                               $('#play').append('<br><h2 id=Matches>Matches Found: '+matchCount+"</h2>");
+                                               $('#play').append('<br><div id=reveal>Show Answers</div><br>');
+                                               $('#reveal').click(function(){
+                                                document.getElementById("answers").style.display = "block";
+                                               })
+
+
+                                               //checks whether a match has been found or not and does an appropriate action
+                                            let potentialMatch = null;
+                                            let potentialMatchId = null;
+                                            $("#play div").click(function(){
+                                                let test = panels.find(element => {
+                                                    return element.id == this.id;
+                                                })
+                                                if(test.found == false){
+                                                    if (potentialMatch == null) {
+                                                        potentialMatch = test.name;
+                                                        potentialMatchId = test.id;
+                                                        this.style.borderColor = "orange";
+                                                        this.style.borderWidth = "5px";
+                                                        this.style.margin = "5px";
+                                                    } else if ((potentialMatch == test.name) && (potentialMatchId != test.id)) {
+                                                        document.getElementById(potentialMatchId).style.borderColor = "green";
+                                                        document.getElementById(potentialMatchId).style.borderWidth = "5px";
+                                                        document.getElementById(potentialMatchId).style.margin = "5px";
+                                                        this.style.borderColor = "green";
+                                                        this.style.borderWidth = "5px";
+                                                        this.style.margin = "5px";
+                                                        test.found = true;
+                                                        panels.find(element => {return element.id == potentialMatchId;}).found = true;
+                                                        potentialMatch = null;
+                                                        potentialMatchId = null;
+                                                        matchCount++;
+                                                        document.getElementById("Matches").innerHTML = "Matches Found: "+matchCount;
+                                                        if(matchCount == gameCountries.length){
+                                                            document.getElementById("Matches").innerHTML = "Congratulations! Play again?";
+                                                        }
+                                                    } else if (potentialMatch != test.name){
+                                                        document.getElementById(potentialMatchId).style.borderColor = "black";
+                                                        document.getElementById(potentialMatchId).style.borderWidth = "2px";
+                                                        document.getElementById(potentialMatchId).style.margin = "8px";
+                                                        potentialMatch = null;
+                                                        potentialMatchId = null;
+                                                    }
+                                                }
+                                                
+                                            })
+                                    
+                                               
+                                                //shows the game
+                                                document.getElementById("play").style.display = "block";
+                                        
+                                            },
+                                            'json'
+                                        )
+                                    }
+                                    
+                                    
+
+                    },
+                    'json'
+                )
+                
+
+            })
+            
+        </script>
+        <style>
+            .gameBoxes{
+                overflow: hidden;
+                height: 120px;
+                width: 200px;
+                background-color: lightgray;
+                border-style: solid;
+                border-width: 2px;
+                border-color: black;
+                margin: 8px;
+                display: inline-block;
+            }
+
+            .AnswerBoxes{
+                overflow: hidden;
+                height: 200px;
+                width: 170px;
+                background-color: lightgray;
+                border-style: solid;
+                border-width: 2px;
+                border-color: black;
+                margin: 5px;
+                display: inline-block;
+            }
+
+            #play{
+                display: flex;
+                flex-direction: row;
+            }
+
+            .imgs{
+                max-height: 100%;
+                max-width: 100%;
+                width: auto;
+                height: auto;
+            }
+
+            .imgs2{
+                max-height: 70%;
+                max-width: 70%;
+                width: auto;
+                height: auto;
+            }
+
+            #reveal{
+                overflow: hidden;
+                background-color: green;
+                padding: 10px;
+                width: 100px;
+                color: white;
+            }
+        </style>
+    </head>
+    <body>
+        <center>
+            <h1>Match countries with their flags</h1>
+            <div id = gameselect>
+                <h3>Select a region:</h3>
+                <form id="regionSelect">
+
+                </form>
+                
+                
+
+            </div>
+            <div id="boardSelect">
+                <h3>Choose the board size:</h3>
+                <form id="boardSize">
+                    <input type="radio" name="boardsize" value= 2 id="4x2" />
+                    <label for="4x2">4x2</label>
+                    <input type="radio" name="boardsize" value= 4 id="4x4" />
+                    <label for="4x4">4x4</label>
+
+                </form>
+            </div>
+            <div id = play display= "none">
+                
+            </div>
+            <div id = answers>
+
+            </div>
+            </center>
+    </body>
+</html>
